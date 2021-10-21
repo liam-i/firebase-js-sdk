@@ -17,15 +17,20 @@
 
 import { FirebaseApp, _getProvider } from '@firebase/app';
 import { Provider } from '@firebase/component';
-import { issuedAtTime } from '@firebase/util';
+import {
+  FirebaseError,
+  issuedAtTime,
+  calculateBackoffMillis
+} from '@firebase/util';
 import { exchangeToken, getExchangeRecaptchaTokenRequest } from './client';
+import { ONE_DAY } from './constants';
 import { AppCheckError, ERROR_FACTORY } from './errors';
 import { CustomProviderOptions } from './public-types';
 import {
   getToken as getReCAPTCHAToken,
   initialize as initializeRecaptcha
 } from './recaptcha';
-import { AppCheckProvider, AppCheckTokenInternal } from './types';
+import { AppCheckProvider, AppCheckTokenInternal, ThrottleData } from './types';
 
 /**
  * App Check provider that can obtain a reCAPTCHA V3 token and exchange it
@@ -37,6 +42,11 @@ export class ReCaptchaV3Provider implements AppCheckProvider {
   private _app?: FirebaseApp;
   private _platformLoggerProvider?: Provider<'platform-logger'>;
   /**
+   * Throttle requests on certain error codes to prevent too many retries
+   * in a short time.
+   */
+  private _throttleData: ThrottleData | null = null;
+  /**
    * Create a ReCaptchaV3Provider instance.
    * @param siteKey - ReCAPTCHA V3 siteKey.
    */
@@ -47,6 +57,20 @@ export class ReCaptchaV3Provider implements AppCheckProvider {
    * @internal
    */
   async getToken(): Promise<AppCheckTokenInternal> {
+    if (this._throttleData) {
+      if (Date.now() - this._throttleData.allowRequestsAfter > 0) {
+        // If after throttle timestamp, clear throttle data.
+        this._throttleData = null;
+      } else {
+        // If before, throw.
+        throw ERROR_FACTORY.create(AppCheckError.THROTTLED, {
+          time: new Date(
+            this._throttleData.allowRequestsAfter
+          ).toLocaleString(),
+          httpStatus: this._throttleData.httpStatus
+        });
+      }
+    }
     if (!this._app || !this._platformLoggerProvider) {
       // This should only occur if user has not called initializeAppCheck().
       // We don't have an appName to provide if so.
@@ -59,10 +83,65 @@ export class ReCaptchaV3Provider implements AppCheckProvider {
       // reCaptcha.execute() throws null which is not very descriptive.
       throw ERROR_FACTORY.create(AppCheckError.RECAPTCHA_ERROR);
     });
-    return exchangeToken(
-      getExchangeRecaptchaTokenRequest(this._app, attestedClaimsToken),
-      this._platformLoggerProvider
-    );
+    let result;
+    try {
+      result = await exchangeToken(
+        getExchangeRecaptchaTokenRequest(this._app, attestedClaimsToken),
+        this._platformLoggerProvider
+      );
+    } catch (e) {
+      if ((e as FirebaseError).code === AppCheckError.FETCH_STATUS_ERROR) {
+        const throttleData = this._setBackoff(
+          Number((e as FirebaseError).customData?.httpStatus)
+        );
+        throw ERROR_FACTORY.create(AppCheckError.THROTTLED, {
+          time: new Date(throttleData.allowRequestsAfter).toLocaleString(),
+          httpStatus: throttleData.httpStatus
+        });
+      } else {
+        throw e;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Set throttle data to block requests until after a certain time
+   * depending on the failed request's status code.
+   * @param httpStatus Status code of failed request.
+   * @returns Data about current throttle state and expiration time.
+   */
+  private _setBackoff(httpStatus: number): ThrottleData {
+    /**
+     * Block retries for 1 day for the following error codes:
+     * 
+     * 404: Likely malformed URL.
+     * 
+     * 403:
+     * - Attestation failed
+     * - Wrong API key
+     * - Project deleted
+     */
+    if (httpStatus === 404 || httpStatus === 403) {
+      this._throttleData = {
+        backoffCount: 1,
+        allowRequestsAfter: Date.now() + ONE_DAY,
+        httpStatus
+      };
+    } else {
+      /**
+       * For all other error codes, the time when it is ok to retry again
+       * is based on exponential backoff.
+       */
+      const backoffCount = this._throttleData ? this._throttleData.backoffCount : 0;
+      const backoffMillis = calculateBackoffMillis(backoffCount, 1000, 2);
+      this._throttleData = {
+        backoffCount: backoffCount + 1,
+        allowRequestsAfter: Date.now() + backoffMillis,
+        httpStatus
+      };
+    }
+    return this._throttleData;
   }
 
   /**
