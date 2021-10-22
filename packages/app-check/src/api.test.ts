@@ -241,6 +241,9 @@ describe('api', () => {
         provider: new ReCaptchaV3Provider(FAKE_SITE_KEY),
         isTokenAutoRefreshEnabled: true
       });
+
+      expect(getState(app).tokenObservers.length).to.equal(1);
+
       const fakeRecaptchaToken = 'fake-recaptcha-token';
       const fakeRecaptchaAppCheckToken = {
         token: 'fake-recaptcha-app-check-token',
@@ -262,7 +265,7 @@ describe('api', () => {
       const unsubscribe1 = onTokenChanged(appCheck, listener1, errorFn1);
       const unsubscribe2 = onTokenChanged(appCheck, listener2, errorFn2);
 
-      expect(getState(app).tokenObservers.length).to.equal(2);
+      expect(getState(app).tokenObservers.length).to.equal(3);
 
       await internalApi.getToken(appCheck as AppCheckService);
 
@@ -275,7 +278,7 @@ describe('api', () => {
       expect(errorFn2).to.not.be.called;
       unsubscribe1();
       unsubscribe2();
-      expect(getState(app).tokenObservers.length).to.equal(0);
+      expect(getState(app).tokenObservers.length).to.equal(1);
     });
 
     it('Listeners work when using Observer pattern', async () => {
@@ -283,6 +286,9 @@ describe('api', () => {
         provider: new ReCaptchaV3Provider(FAKE_SITE_KEY),
         isTokenAutoRefreshEnabled: true
       });
+
+      expect(getState(app).tokenObservers.length).to.equal(1);
+
       const fakeRecaptchaToken = 'fake-recaptcha-token';
       const fakeRecaptchaAppCheckToken = {
         token: 'fake-recaptcha-app-check-token',
@@ -314,7 +320,7 @@ describe('api', () => {
         error: errorFn1
       });
 
-      expect(getState(app).tokenObservers.length).to.equal(2);
+      expect(getState(app).tokenObservers.length).to.equal(3);
 
       await internalApi.getToken(appCheck as AppCheckService);
 
@@ -327,7 +333,7 @@ describe('api', () => {
       expect(errorFn2).to.not.be.called;
       unsubscribe1();
       unsubscribe2();
-      expect(getState(app).tokenObservers.length).to.equal(0);
+      expect(getState(app).tokenObservers.length).to.equal(1);
     });
 
     it('onError() catches token errors', async () => {
@@ -336,6 +342,9 @@ describe('api', () => {
         provider: new ReCaptchaV3Provider(FAKE_SITE_KEY),
         isTokenAutoRefreshEnabled: false
       });
+
+      expect(getState(app).tokenObservers.length).to.equal(1);
+
       const fakeRecaptchaToken = 'fake-recaptcha-token';
       stub(reCAPTCHA, 'getToken').returns(Promise.resolve(fakeRecaptchaToken));
       stub(client, 'exchangeToken').rejects('exchange error');
@@ -349,13 +358,13 @@ describe('api', () => {
 
       await internalApi.getToken(appCheck as AppCheckService);
 
-      expect(getState(app).tokenObservers.length).to.equal(1);
+      expect(getState(app).tokenObservers.length).to.equal(2);
 
       expect(errorFn1).to.be.calledOnce;
       expect(errorFn1.args[0][0].name).to.include('exchange error');
 
       unsubscribe1();
-      expect(getState(app).tokenObservers.length).to.equal(0);
+      expect(getState(app).tokenObservers.length).to.equal(1);
     });
   });
 });
