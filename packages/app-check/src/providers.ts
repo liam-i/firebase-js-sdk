@@ -31,6 +31,7 @@ import {
   initialize as initializeRecaptcha
 } from './recaptcha';
 import { AppCheckProvider, AppCheckTokenInternal, ThrottleData } from './types';
+import { getDurationString } from './util';
 
 /**
  * App Check provider that can obtain a reCAPTCHA V3 token and exchange it
@@ -95,7 +96,7 @@ export class ReCaptchaV3Provider implements AppCheckProvider {
           Number((e as FirebaseError).customData?.httpStatus)
         );
         throw ERROR_FACTORY.create(AppCheckError.THROTTLED, {
-          time: new Date(throttleData.allowRequestsAfter).toLocaleString(),
+          time: getDurationString(throttleData.allowRequestsAfter - Date.now()),
           httpStatus: throttleData.httpStatus
         });
       } else {
