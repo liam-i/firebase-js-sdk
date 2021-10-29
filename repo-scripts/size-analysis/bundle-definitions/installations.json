@@ -1,0 +1,93 @@
+[
+  {
+    "name": "getId",
+    "dependencies": [
+      {
+        "packageName": "firebase",
+        "versionOrTag": "exp",
+        "imports": [
+          {
+            "path": "installations",
+            "imports": [
+              "getInstallations",
+              "getId"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "getToken",
+    "dependencies": [
+      {
+        "packageName": "firebase",
+        "versionOrTag": "exp",
+        "imports": [
+          {
+            "path": "installations",
+            "imports": [
+              "getInstallations",
+              "getToken"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "deleteInstallations",
+    "dependencies": [
+      {
+        "packageName": "firebase",
+        "versionOrTag": "exp",
+        "imports": [
+          {
+            "path": "installations",
+            "imports": [
+              "getInstallations",
+              "deleteInstallations"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "onIdChange",
+    "dependencies": [
+      {
+        "packageName": "firebase",
+        "versionOrTag": "exp",
+        "imports": [
+          {
+            "path": "installations",
+            "imports": [
+              "getInstallations",
+              "onIdChange"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "getId + getToken",
+    "dependencies": [
+      {
+        "packageName": "firebase",
+        "versionOrTag": "exp",
+        "imports": [
+          {
+            "path": "installations",
+            "imports": [
+              "getInstallations",
+              "getId",
+              "getToken"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
